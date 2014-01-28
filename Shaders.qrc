@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>graphshader.vert</file>
+        <file>graphshader.frag</file>
+        <file>gridshader.frag</file>
+        <file>gridshader.vert</file>
+    </qresource>
+</RCC>
