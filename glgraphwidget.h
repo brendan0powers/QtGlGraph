@@ -42,10 +42,8 @@ private:
     void UpdateGridBuffer();
 
     QGLShaderProgram m_gridShader;
-    int m_iGridVertexId;
     QVector<float> m_fvGridVBuffer;
     QGLShaderProgram m_graphShader;
-    int m_iVertexId;
 
     QColor m_axisColor;
     QColor m_gridColor;

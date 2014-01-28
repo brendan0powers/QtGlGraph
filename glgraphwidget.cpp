@@ -68,8 +68,8 @@ void GlGraphWidget::setData(const QVector<float> &data)
     //init x axis
     if(m_xAxis.size() != data.size())
     {
-        float curX = 0;
-        float stepSize = (float)1/(float)data.size();
+        float curX = -1;
+        float stepSize = (float)2/(float)data.size();
 
         m_xAxis.resize(data.size());
 
@@ -98,17 +98,6 @@ void GlGraphWidget::setData(const QVector<float> &data)
 
     if(m_bInitialized)
     {
-        if(m_iTextureId >= 0)
-            glDeleteTextures(1, &m_iTextureId);
-
-        //Set up GL Texture
-        makeCurrent();
-        glEnable(GL_TEXTURE_2D);
-        glGenTextures(1, &m_iTextureId);
-        glBindTexture(GL_TEXTURE_2D, m_iTextureId);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_LUMINANCE, m_yAxis.size(), 1, 0, GL_LUMINANCE, GL_FLOAT, m_yAxis.constData());
-
         update();
     }
 }
@@ -148,15 +137,11 @@ void GlGraphWidget::initializeGL()
     m_graphShader.addShaderFromSourceFile(QGLShader::Fragment, ":/graphshader.frag");
     m_graphShader.link();
     m_graphShader.bind();
-    m_iVertexId = m_graphShader.attributeLocation("vertex");
 
     m_gridShader.addShaderFromSourceFile(QGLShader::Vertex, ":/gridshader.vert");
     m_gridShader.addShaderFromSourceFile(QGLShader::Fragment, ":/gridshader.frag");
     m_gridShader.link();
     m_gridShader.bind();
-    m_iGridVertexId = m_gridShader.attributeLocation("vertex");
-
-    qDebug() << "VERTEX" << m_iVertexId << m_iGridVertexId;
 
     m_bInitialized = true;
 
@@ -168,9 +153,6 @@ void GlGraphWidget::initializeGL()
 void GlGraphWidget::paintEvent(QPaintEvent *event)
 {
     makeCurrent();
-
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
 
     qglClearColor(m_bgColor);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -188,18 +170,16 @@ void GlGraphWidget::paintEvent(QPaintEvent *event)
     m_graphShader.setUniformValue("lineColor", m_lineColor);
     m_graphShader.setUniformValue("scaleFactor", getScaleFactor());
     m_graphShader.setUniformValue("yOffset", getYOffset());
-    m_graphShader.enableAttributeArray(m_iVertexId);
-    m_graphShader.setAttributeArray(m_iVertexId, (GLfloat *)m_xAxis.constData(), 1, 0);
-    qDebug() << m_xAxis.constData();
+    m_graphShader.enableAttributeArray("xAxis");
+    m_graphShader.setAttributeArray("xAxis", (GLfloat *)m_xAxis.constData(), 1, 0);
+    m_graphShader.enableAttributeArray("yAxis");
+    m_graphShader.setAttributeArray("yAxis", (GLfloat *)m_yAxis.constData(), 1, 0);
 
     glLineWidth(m_fLineWidth);
     glDrawArrays(GL_LINE_STRIP, 0, m_xAxis.size());
 
-    m_graphShader.disableAttributeArray(m_iVertexId);
+    glLineWidth(1);
 
-    glPopMatrix();
-
-    //qDebug() << "Paint!" << m_fMin << m_fMax;
     swapBuffers();
 }
 

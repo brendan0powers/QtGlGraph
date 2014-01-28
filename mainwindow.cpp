@@ -41,7 +41,6 @@ void MainWindow::newData()
         //data[i] *= 10;
     }
 
-    //qDebug() << m_data.constData();
     ui->graphWidget->setData(m_data);
 }
 
