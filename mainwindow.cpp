@@ -28,15 +28,20 @@ MainWindow::~MainWindow()
 
 void MainWindow::newData()
 {
+    float *data = (float *)m_data.constData();
+
     for(int i = 0; i < 4000; i++)
     {
-        m_data[i] = (sin((float)i/100.0)/2.0);
+        data[i] = (sin((float)i/100.0)/2.0);
         if(ui->noiseSlider->value() != 0)
         {
-            m_data[i] += ((((float)rand()/RAND_MAX)-0.5)/(100 / ui->noiseSlider->value()));
+            data[i] += ((((float)rand()/RAND_MAX)-0.5)/(100 / ui->noiseSlider->value()));
         }
+
+        //data[i] *= 10;
     }
 
+    //qDebug() << m_data.constData();
     ui->graphWidget->setData(m_data);
 }
 

@@ -4,19 +4,17 @@
 #
 #-------------------------------------------------
 
-QT       += core gui opengl
-
-greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+QT       += core gui opengl widgets
 
 TARGET = GlGraph
 TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    glgraphwidget.cpp
+        glgraphwidget.cpp
 
 HEADERS  += mainwindow.h \
-    glgraphwidget.h
+         glgraphwidget.h
 
 FORMS    += mainwindow.ui
 

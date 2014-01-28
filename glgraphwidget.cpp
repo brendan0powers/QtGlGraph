@@ -11,6 +11,7 @@ GlGraphWidget::GlGraphWidget(QWidget *parent)
    , m_fAxisLineWidth(2)
    , m_fGridLineWidth(1)
    , m_fLineWidth(1)
+   , m_iTextureId(-1)
    , m_fMin(0)
    , m_fMax(0)
    , m_fYMin(-1)
@@ -88,7 +89,7 @@ void GlGraphWidget::setData(const QVector<float> &data)
 
     for(int i = 0; i < data.size(); i++)
     {
-        float tmp = data[i];
+        float tmp = data.constData()[i];
         if(tmp < m_fMin)
             m_fMin = tmp;
         if(tmp > m_fMax)
@@ -97,10 +98,12 @@ void GlGraphWidget::setData(const QVector<float> &data)
 
     if(m_bInitialized)
     {
+        if(m_iTextureId >= 0)
+            glDeleteTextures(1, &m_iTextureId);
+
         //Set up GL Texture
         makeCurrent();
         glEnable(GL_TEXTURE_2D);
-        glActiveTexture(GL_TEXTURE0);
         glGenTextures(1, &m_iTextureId);
         glBindTexture(GL_TEXTURE_2D, m_iTextureId);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -178,7 +181,6 @@ void GlGraphWidget::paintEvent(QPaintEvent *event)
     m_graphShader.bind();
 
     glEnable(GL_TEXTURE_2D);
-    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_iTextureId);
 
     m_graphShader.setUniformValue("transform", m_transformMatrix);
@@ -186,8 +188,9 @@ void GlGraphWidget::paintEvent(QPaintEvent *event)
     m_graphShader.setUniformValue("lineColor", m_lineColor);
     m_graphShader.setUniformValue("scaleFactor", getScaleFactor());
     m_graphShader.setUniformValue("yOffset", getYOffset());
-    m_graphShader.setAttributeArray(m_iVertexId, (GLfloat *)m_xAxis.constData(), 1, 0);
     m_graphShader.enableAttributeArray(m_iVertexId);
+    m_graphShader.setAttributeArray(m_iVertexId, (GLfloat *)m_xAxis.constData(), 1, 0);
+    qDebug() << m_xAxis.constData();
 
     glLineWidth(m_fLineWidth);
     glDrawArrays(GL_LINE_STRIP, 0, m_xAxis.size());
@@ -205,8 +208,8 @@ void GlGraphWidget::drawGrid()
 
     m_gridShader.bind();
     m_gridShader.enableAttributeArray("vertex");
-    m_gridShader.setAttributeArray("vertex", (GLfloat *)m_fvGridVBuffer.constData(), 2, 0);
     m_gridShader.setUniformValue("transform", m_transformMatrix);
+    m_gridShader.setAttributeArray("vertex", (GLfloat *)m_fvGridVBuffer.constData(), 2, 0);
 
     if(m_fvGridVBuffer.size() > 8)
     {
