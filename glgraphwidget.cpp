@@ -1,6 +1,9 @@
 #include "glgraphwidget.h"
 #include <QDebug>
+#include <QPointF>
+#include <QMouseEvent>
 #include "float.h"
+#include "math.h"
 
 GlGraphWidget::GlGraphWidget(QWidget *parent)
    : QGLWidget(parent)
@@ -11,7 +14,6 @@ GlGraphWidget::GlGraphWidget(QWidget *parent)
    , m_fAxisLineWidth(2)
    , m_fGridLineWidth(1)
    , m_fLineWidth(1)
-   , m_iTextureId(-1)
    , m_fMin(0)
    , m_fMax(0)
    , m_fYMin(-1)
@@ -21,10 +23,12 @@ GlGraphWidget::GlGraphWidget(QWidget *parent)
    , m_iGridSizeX(10)
    , m_iGridSizeY(10)
    , m_bLeftAlignedAxis(true)
+   , m_fZoomStepSize(0.1)
 {
     setAutoFillBackground(false);
     m_transformMatrix.setToIdentity();
     m_transformMatrix.scale(0.9);
+    m_zoomMatrix.setToIdentity();
 }
 
 void GlGraphWidget::setGridColor(const QColor &color)
@@ -128,6 +132,22 @@ void GlGraphWidget::setGridSize(int x, int y)
     UpdateGridBuffer();
 }
 
+void GlGraphWidget::zoom(float zoomFactor, const QPointF &offset)
+{
+    m_zoomMatrix.translate(offset.x(), offset.y());
+    m_zoomMatrix.scale(zoomFactor);
+}
+
+void GlGraphWidget::resetZoom()
+{
+    m_zoomMatrix.setToIdentity();
+}
+
+void GlGraphWidget::setZoomStepSize(float stepSize)
+{
+    m_fZoomStepSize = stepSize;
+}
+
 void GlGraphWidget::initializeGL()
 {
     //glEnable(GL_DEPTH_TEST);
@@ -144,10 +164,6 @@ void GlGraphWidget::initializeGL()
     m_gridShader.bind();
 
     m_bInitialized = true;
-
-    //If we have data, then set up the buffers
-    if(m_yAxis.size() != 0)
-        setData(m_yAxis);
 }
 
 void GlGraphWidget::paintEvent(QPaintEvent *event)
@@ -160,12 +176,10 @@ void GlGraphWidget::paintEvent(QPaintEvent *event)
 
     drawGrid();
 
+    //Set up the graph shader
     m_graphShader.bind();
-
-    glEnable(GL_TEXTURE_2D);
-    glBindTexture(GL_TEXTURE_2D, m_iTextureId);
-
     m_graphShader.setUniformValue("transform", m_transformMatrix);
+    m_graphShader.setUniformValue("zoom", m_zoomMatrix);
     m_graphShader.setUniformValue("texture", 0);
     m_graphShader.setUniformValue("lineColor", m_lineColor);
     m_graphShader.setUniformValue("scaleFactor", getScaleFactor());
@@ -175,9 +189,25 @@ void GlGraphWidget::paintEvent(QPaintEvent *event)
     m_graphShader.enableAttributeArray("yAxis");
     m_graphShader.setAttributeArray("yAxis", (GLfloat *)m_yAxis.constData(), 1, 0);
 
+
+    //Calculate the clippring region
+    QPointF bottomLeft = m_transformMatrix.map(QPointF(-1,-1));
+    QPointF topRight = m_transformMatrix.map(QPointF(1,1));
+    bottomLeft.setX((bottomLeft.x() + 1) * width()/2);
+    bottomLeft.setY((bottomLeft.y() + 1) * height()/2);
+    topRight.setX((topRight.x() + 1) * width()/2);
+    topRight.setY((topRight.y() + 1) * height()/2);
+
+    //Enable clipping
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(bottomLeft.x(), bottomLeft.y(), topRight.x() - bottomLeft.x(), topRight.y() - bottomLeft.y());
+
+    //Draw the graph
     glLineWidth(m_fLineWidth);
     glDrawArrays(GL_LINE_STRIP, 0, m_xAxis.size());
 
+    //Clean up
+    glDisable(GL_SCISSOR_TEST);
     glLineWidth(1);
 
     swapBuffers();
@@ -187,8 +217,8 @@ void GlGraphWidget::drawGrid()
 {
 
     m_gridShader.bind();
-    m_gridShader.enableAttributeArray("vertex");
     m_gridShader.setUniformValue("transform", m_transformMatrix);
+    m_gridShader.enableAttributeArray("vertex");
     m_gridShader.setAttributeArray("vertex", (GLfloat *)m_fvGridVBuffer.constData(), 2, 0);
 
     if(m_fvGridVBuffer.size() > 8)
@@ -211,7 +241,7 @@ void GlGraphWidget::drawGrid()
 
 void GlGraphWidget::resizeGL(int width, int height)
 {
-    qDebug() << "resizeGL" << width << height;
+    //qDebug() << "resizeGL" << width << height;
     glViewport(0,0, width, height);
 }
 
@@ -223,6 +253,31 @@ void GlGraphWidget::mousePressEvent(QMouseEvent *event)
 void GlGraphWidget::mouseMoveEvent(QMouseEvent *event)
 {
 
+}
+
+void GlGraphWidget::mouseReleaseEvent(QMouseEvent *event)
+{
+    QPointF pos((((float)event->pos().x()/width()) * 2.0) - 1.0,(((float)event->pos().y()/height()) * 2.0) - 1.0);
+    pos = m_transformMatrix.inverted().map(pos);
+    pos.setX(pos.x() * -1);
+    if(fabs((float)pos.x()) > 1 || fabs((float)pos.y()) >1)
+        return;
+
+    if(event->button() == Qt::LeftButton)
+    {
+        zoom(1.0 + m_fZoomStepSize, pos);
+    }
+    else if(event->button() == Qt::RightButton)
+    {
+        zoom(1.0 - m_fZoomStepSize, QPointF(0,0));
+    }
+    else if(event->button() == Qt::MiddleButton)
+    {
+        resetZoom();
+    }
+
+
+    qDebug() << pos;
 }
 
 void GlGraphWidget::showEvent(QShowEvent *event)
@@ -302,7 +357,7 @@ void GlGraphWidget::UpdateGridBuffer()
         m_fvGridVBuffer.append(startX);
         m_fvGridVBuffer.append(1);
 
-        qDebug() << QPointF(startX, -1) << QPointF(startX, 1);
+        //qDebug() << QPointF(startX, -1) << QPointF(startX, 1);
 
         startX += gridWidth;
     }
@@ -315,7 +370,7 @@ void GlGraphWidget::UpdateGridBuffer()
         m_fvGridVBuffer.append(1);
         m_fvGridVBuffer.append(startY);
 
-        qDebug() << QPointF(startX, -1) << QPointF(startX, 1);
+        //qDebug() << QPointF(startX, -1) << QPointF(startX, 1);
 
         startY += gridHeight;
     }

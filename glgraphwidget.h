@@ -24,8 +24,12 @@ public:
     void setAutoScale(bool scale);
     
     void setLeftAlignedAxis(bool left);
-
     void setGridSize(int x, int y);
+
+    void zoom(float zoomFactor, const QPointF &offset);
+    void resetZoom();
+    void setZoomStepSize(float stepSize);
+
 
 protected:
     virtual void initializeGL();
@@ -33,6 +37,7 @@ protected:
     virtual void resizeGL(int width, int height);
     virtual void mousePressEvent(QMouseEvent *event);
     virtual void mouseMoveEvent(QMouseEvent *event);
+    virtual void mouseReleaseEvent(QMouseEvent *event);
     virtual void showEvent(QShowEvent *event);
     
 private:
@@ -55,7 +60,6 @@ private:
 
     QVector<float> m_xAxis;
     QVector<float> m_yAxis;
-    GLuint m_iTextureId;
     float m_fMin;
     float m_fMax;
     float m_fYMin;
@@ -69,6 +73,8 @@ private:
     bool m_bLeftAlignedAxis;
 
     QMatrix4x4 m_transformMatrix;
+    QMatrix4x4 m_zoomMatrix;
+    float m_fZoomStepSize;
 };
 
 #endif // GLGRAPHWIDGET_H
