@@ -136,6 +136,7 @@ void GlGraphWidget::zoom(float zoomFactor, const QPointF &offset)
 {
     m_zoomMatrix.translate(offset.x(), offset.y());
     m_zoomMatrix.scale(zoomFactor);
+    m_zoomMatrix.translate(offset.x() * -zoomFactor, offset.y() * -zoomFactor);
 }
 
 void GlGraphWidget::resetZoom()
@@ -259,7 +260,8 @@ void GlGraphWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     QPointF pos((((float)event->pos().x()/width()) * 2.0) - 1.0,(((float)event->pos().y()/height()) * 2.0) - 1.0);
     pos = m_transformMatrix.inverted().map(pos);
-    pos.setX(pos.x() * -1);
+    //pos.setX(pos.x() * -1);
+    pos.setY(pos.y() * -1);
     if(fabs((float)pos.x()) > 1 || fabs((float)pos.y()) >1)
         return;
 
