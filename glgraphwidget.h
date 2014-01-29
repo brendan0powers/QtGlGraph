@@ -10,6 +10,13 @@ class GlGraphWidget : public QGLWidget
 {
     Q_OBJECT
 public:
+    enum AxisStyle
+    {
+        LeftAxis,
+        RightAxis,
+        NoAxis
+    };
+
     explicit GlGraphWidget(QWidget *parent = 0);
 
     void setGridColor(const QColor &color);
@@ -23,7 +30,7 @@ public:
     void setDataLimits(float min, float max);
     void setAutoScale(bool scale);
     
-    void setLeftAlignedAxis(bool left);
+    void setAxisStyle(AxisStyle style);
     void setGridSize(int x, int y);
 
     void zoom(float zoomFactor, const QPointF &offset);
@@ -38,7 +45,6 @@ protected:
     virtual void mousePressEvent(QMouseEvent *event);
     virtual void mouseMoveEvent(QMouseEvent *event);
     virtual void mouseReleaseEvent(QMouseEvent *event);
-    virtual void showEvent(QShowEvent *event);
     
 private:
     void drawGrid();
@@ -70,7 +76,7 @@ private:
     int m_iGridSizeX;
     int m_iGridSizeY;
 
-    bool m_bLeftAlignedAxis;
+    AxisStyle m_axisStyle;
 
     QMatrix4x4 m_transformMatrix;
     QMatrix4x4 m_zoomMatrix;

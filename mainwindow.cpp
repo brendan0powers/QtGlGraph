@@ -44,19 +44,64 @@ void MainWindow::newData()
     ui->graphWidget->setData(m_data);
 }
 
-void MainWindow::on_UpdateButton_clicked()
+void MainWindow::on_LeftAxisButton_toggled()
 {
-    ui->graphWidget->setGridSize(ui->GridX->value(), ui->GridY->value());
+    ui->graphWidget->setAxisStyle(GlGraphWidget::LeftAxis);
+}
 
-    ui->graphWidget->setLineWidth(ui->LineWidth->value());
-    ui->graphWidget->setAxisLineWidth(ui->AxisLineWidth->value());
-    ui->graphWidget->setGridLineWidth(ui->GridLineWidth->value());
+void MainWindow::on_RightAxisButton_toggled()
+{
+    ui->graphWidget->setAxisStyle(GlGraphWidget::RightAxis);
+}
 
+void MainWindow::on_NoAxisButton_toggled()
+{
+    ui->graphWidget->setAxisStyle(GlGraphWidget::NoAxis);
+}
+
+void MainWindow::on_AutoScaleButton_toggled(bool checked)
+{
+    ui->graphWidget->setAutoScale(checked);
+}
+
+void MainWindow::on_YMax_valueChanged(double)
+{
     ui->graphWidget->setDataLimits(ui->YMin->value(), ui->YMax->value());
     ui->graphWidget->setAutoScale(ui->AutoScaleButton->isChecked());
+}
 
-    ui->graphWidget->setLeftAlignedAxis(ui->LeftAxisButton->isChecked());
+void MainWindow::on_YMin_valueChanged(double)
+{
+    ui->graphWidget->setDataLimits(ui->YMin->value(), ui->YMax->value());
+    ui->graphWidget->setAutoScale(ui->AutoScaleButton->isChecked());
+}
 
-    m_timer->start(1000/ui->fps->value());
-    qDebug() << "START" << ui->fps->value();
+void MainWindow::on_LineWidth_valueChanged(int value)
+{
+    ui->graphWidget->setLineWidth(value);
+}
+
+void MainWindow::on_AxisLineWidth_valueChanged(int value)
+{
+    ui->graphWidget->setAxisLineWidth(value);
+}
+
+void MainWindow::on_GridLineWidth_valueChanged(int value)
+{
+    ui->graphWidget->setGridLineWidth(value);
+}
+
+void MainWindow::on_GridX_valueChanged(int)
+{
+    ui->graphWidget->setGridSize(ui->GridX->value(), ui->GridY->value());
+}
+
+void MainWindow::on_GridY_valueChanged(int)
+{
+    ui->graphWidget->setGridSize(ui->GridX->value(), ui->GridY->value());
+}
+
+void MainWindow::on_fps_valueChanged(int value)
+{
+    m_timer->start(1000/value);
 }

@@ -22,7 +22,7 @@ GlGraphWidget::GlGraphWidget(QWidget *parent)
    , m_bInitialized(false)
    , m_iGridSizeX(10)
    , m_iGridSizeY(10)
-   , m_bLeftAlignedAxis(true)
+   , m_axisStyle(LeftAxis)
    , m_fZoomStepSize(0.1)
 {
     setAutoFillBackground(false);
@@ -61,9 +61,9 @@ void GlGraphWidget::setAxisLineWidth(float width)
     m_fAxisLineWidth = width;
 }
 
-void GlGraphWidget::setLeftAlignedAxis(bool left)
+void GlGraphWidget::setAxisStyle(AxisStyle style)
 {
-    m_bLeftAlignedAxis = left;
+    m_axisStyle = style;
     UpdateGridBuffer();
 }
 
@@ -79,14 +79,12 @@ void GlGraphWidget::setData(const QVector<float> &data)
 
         for(int i = 0; i < data.size(); i++)
         {
-            //qDebug() << i << curX;
             m_xAxis[i] = curX;
             curX += stepSize;
         }
-
-        //qDebug() << "LastX" << curX;
     }
 
+    //Find limits of Y axis
     m_yAxis = data;
     m_fMax = FLT_MIN_EXP;
     m_fMin = FLT_MAX_EXP;
@@ -100,6 +98,7 @@ void GlGraphWidget::setData(const QVector<float> &data)
             m_fMax = tmp;
     }
 
+    //Request an update
     if(m_bInitialized)
     {
         update();
@@ -151,7 +150,6 @@ void GlGraphWidget::setZoomStepSize(float stepSize)
 
 void GlGraphWidget::initializeGL()
 {
-    //glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
 
     m_graphShader.addShaderFromSourceFile(QGLShader::Vertex, ":/graphshader.vert");
@@ -169,7 +167,7 @@ void GlGraphWidget::initializeGL()
 
 void GlGraphWidget::paintEvent(QPaintEvent *event)
 {
-    makeCurrent();
+    makeCurrent(); //Make the GL context current
 
     qglClearColor(m_bgColor);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -216,24 +214,31 @@ void GlGraphWidget::paintEvent(QPaintEvent *event)
 
 void GlGraphWidget::drawGrid()
 {
-
     m_gridShader.bind();
     m_gridShader.setUniformValue("transform", m_transformMatrix);
     m_gridShader.enableAttributeArray("vertex");
     m_gridShader.setAttributeArray("vertex", (GLfloat *)m_fvGridVBuffer.constData(), 2, 0);
+
+    //The offset for drawing the grid is 4 if we are drawing an axis, 0 otherwise
+    int bufferStart = 4;
+    if(m_axisStyle == NoAxis)
+        bufferStart = 0;
 
     if(m_fvGridVBuffer.size() > 8)
     {
         //Draw grid
         m_gridShader.setUniformValue("lineColor", m_gridColor);
         glLineWidth(m_fGridLineWidth);
-        glDrawArrays(GL_LINES, 4, (2*(m_iGridSizeX + 1)) + (2*(m_iGridSizeY + 1)));
+        glDrawArrays(GL_LINES, bufferStart, (2*(m_iGridSizeX + 1)) + (2*(m_iGridSizeY + 1)));
     }
 
-    //Draw Axis
-    m_gridShader.setUniformValue("lineColor", m_axisColor);
-    glLineWidth(m_fAxisLineWidth);
-    glDrawArrays(GL_LINES, 0, 4);
+    if(m_axisStyle != NoAxis)
+    {
+        //Draw Axis
+        m_gridShader.setUniformValue("lineColor", m_axisColor);
+        glLineWidth(m_fAxisLineWidth);
+        glDrawArrays(GL_LINES, 0, 4);
+    }
 
 
     m_gridShader.disableAttributeArray("vertex");
@@ -277,14 +282,6 @@ void GlGraphWidget::mouseReleaseEvent(QMouseEvent *event)
     {
         resetZoom();
     }
-
-
-    qDebug() << pos;
-}
-
-void GlGraphWidget::showEvent(QShowEvent *event)
-{
-
 }
 
 float GlGraphWidget::getScaleFactor()
@@ -313,7 +310,7 @@ void GlGraphWidget::UpdateGridBuffer()
     m_fvGridVBuffer.clear();
 
     //Set up axis
-    if(m_bLeftAlignedAxis)
+    if(m_axisStyle == LeftAxis)
     {
         m_fvGridVBuffer.append(-1.01);
         m_fvGridVBuffer.append(-1);
@@ -325,7 +322,7 @@ void GlGraphWidget::UpdateGridBuffer()
         m_fvGridVBuffer.append(1);
         m_fvGridVBuffer.append(-1);
     }
-    else
+    else if(m_axisStyle == RightAxis)
     {
         m_fvGridVBuffer.append(1.01);
         m_fvGridVBuffer.append(-1);
@@ -359,8 +356,6 @@ void GlGraphWidget::UpdateGridBuffer()
         m_fvGridVBuffer.append(startX);
         m_fvGridVBuffer.append(1);
 
-        //qDebug() << QPointF(startX, -1) << QPointF(startX, 1);
-
         startX += gridWidth;
     }
 
@@ -371,8 +366,6 @@ void GlGraphWidget::UpdateGridBuffer()
         m_fvGridVBuffer.append(startY);
         m_fvGridVBuffer.append(1);
         m_fvGridVBuffer.append(startY);
-
-        //qDebug() << QPointF(startX, -1) << QPointF(startX, 1);
 
         startY += gridHeight;
     }

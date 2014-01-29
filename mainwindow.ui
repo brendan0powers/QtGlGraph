@@ -40,6 +40,9 @@
           </item>
           <item>
            <widget class="QSpinBox" name="fps">
+            <property name="minimum">
+             <number>1</number>
+            </property>
             <property name="value">
              <number>33</number>
             </property>
@@ -113,6 +116,9 @@
         </item>
         <item row="0" column="1">
          <widget class="QSpinBox" name="LineWidth">
+          <property name="minimum">
+           <number>1</number>
+          </property>
           <property name="value">
            <number>1</number>
           </property>
@@ -127,6 +133,9 @@
         </item>
         <item row="1" column="1">
          <widget class="QSpinBox" name="GridLineWidth">
+          <property name="minimum">
+           <number>1</number>
+          </property>
           <property name="value">
            <number>1</number>
           </property>
@@ -141,6 +150,9 @@
         </item>
         <item row="2" column="1">
          <widget class="QSpinBox" name="AxisLineWidth">
+          <property name="minimum">
+           <number>1</number>
+          </property>
           <property name="value">
            <number>2</number>
           </property>
@@ -250,6 +262,13 @@
          <widget class="QRadioButton" name="RightAxisButton">
           <property name="text">
            <string>Right Axis</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QRadioButton" name="NoAxisButton">
+          <property name="text">
+           <string>No Axis</string>
           </property>
          </widget>
         </item>

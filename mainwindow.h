@@ -20,7 +20,18 @@ public:
 
 protected slots:
     void newData();
-    void on_UpdateButton_clicked();
+    void on_LeftAxisButton_toggled();
+    void on_RightAxisButton_toggled();
+    void on_NoAxisButton_toggled();
+    void on_AutoScaleButton_toggled(bool checked);
+    void on_YMax_valueChanged(double value);
+    void on_YMin_valueChanged(double value);
+    void on_LineWidth_valueChanged(int value);
+    void on_AxisLineWidth_valueChanged(int value);
+    void on_GridLineWidth_valueChanged(int value);
+    void on_GridX_valueChanged(int value);
+    void on_GridY_valueChanged(int value);
+    void on_fps_valueChanged(int value);
 
 private:
     Ui::MainWindow *ui;
