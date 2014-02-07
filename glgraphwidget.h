@@ -27,7 +27,8 @@ public:
     void setGridLineWidth(float width);
 
     void setData(const QVector<float> &data);
-    void setDataLimits(float min, float max);
+    void setYAxisLimits(float min, float max);
+    void setXAxisLimits(float min, float max);
     void setAutoScale(bool scale);
     
     void setAxisStyle(AxisStyle style);
@@ -37,6 +38,17 @@ public:
     void resetZoom();
     void setZoomStepSize(float stepSize);
 
+    void setHeaderText(const QString &text);
+    void setHeaderFont(const QFont &font);
+    void setHeaderColor(const QColor &color);
+    void setFooterText(const QString &text);
+    void setFooterFont(const QFont &font);
+    void setFooterColor(const QColor &color);
+    void setAxisFont(const QFont &font);
+    void setAxisTextColor(const QColor &color);
+
+    void setMargins(int margin);
+    void setMargins(int left, int top, int right, int bottom);
 
 protected:
     virtual void initializeGL();
@@ -47,10 +59,16 @@ protected:
     virtual void mouseReleaseEvent(QMouseEvent *event);
     
 private:
+    void drawAxis();
     void drawGrid();
+    void drawText();
     float getScaleFactor();
     float getYOffset();
-    void UpdateGridBuffer();
+    void UpdateGrid();
+    void CreateGridBuffer();
+    void UpdateMargins();
+    void CalculateMargins();
+    QPointF ToScreenCoords(const QPointF &point);
 
     QGLShaderProgram m_gridShader;
     QVector<float> m_fvGridVBuffer;
@@ -70,6 +88,8 @@ private:
     float m_fMax;
     float m_fYMin;
     float m_fYMax;
+    float m_fXMin;
+    float m_fXMax;
     bool m_bAutoScale;
     bool m_bInitialized;
 
@@ -81,6 +101,27 @@ private:
     QMatrix4x4 m_transformMatrix;
     QMatrix4x4 m_zoomMatrix;
     float m_fZoomStepSize;
+
+    bool m_bRecalcMargins;
+    bool m_bUpdateGridBuffer;
+
+    bool m_bHeaderEnabled;
+    QString m_sHeaderText;
+    QFont m_fntHeaderFont;
+    QColor m_cHeaderColor;
+    bool m_bFooterEnabled;
+    QString m_sFooterText;
+    QFont m_fntFooterFont;
+    QColor m_cFooterColor;
+    QFont m_fntAxisFont;
+    QColor m_cAxisTextColor;
+    QMargins m_margins;
+
+    QRect m_headerRect;
+    QRect m_footerRect;
+    QRect m_xAxisRect;
+    QRect m_yAxisRect;
+
 };
 
 #endif // GLGRAPHWIDGET_H

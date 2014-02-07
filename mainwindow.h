@@ -32,6 +32,8 @@ protected slots:
     void on_GridX_valueChanged(int value);
     void on_GridY_valueChanged(int value);
     void on_fps_valueChanged(int value);
+    void on_lineHeader_textChanged(const QString text);
+    void on_lineFooter_textChanged(const QString text);
 
 private:
     Ui::MainWindow *ui;

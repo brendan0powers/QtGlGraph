@@ -5,6 +5,8 @@
 #include "float.h"
 #include "math.h"
 
+#define TEXT_MARGIN 10
+
 GlGraphWidget::GlGraphWidget(QWidget *parent)
    : QGLWidget(parent)
    , m_axisColor(QColor::fromRgb(255,255,255,255))
@@ -23,11 +25,23 @@ GlGraphWidget::GlGraphWidget(QWidget *parent)
    , m_iGridSizeX(10)
    , m_iGridSizeY(10)
    , m_axisStyle(LeftAxis)
-   , m_fZoomStepSize(0.1)
+   , m_fZoomStepSize((float)0.1)
+   , m_bRecalcMargins(true)
+   , m_bUpdateGridBuffer(true)
+   , m_bHeaderEnabled(false)
+   , m_sHeaderText("")
+   , m_fntHeaderFont(QFont("Arial", 12))
+   , m_cHeaderColor(QColor::fromRgb(255,255,255,255))
+   , m_bFooterEnabled(false)
+   , m_sFooterText("")
+   , m_fntFooterFont(QFont("Arial", 8))
+   , m_cFooterColor(QColor::fromRgb(255,255,255,255))
+   , m_fntAxisFont(QFont("Arial", 9))
+   , m_cAxisTextColor(QColor::fromRgb(255,255,255,255))
+   , m_margins(QMargins(20,10,20,10))
 {
     setAutoFillBackground(false);
     m_transformMatrix.setToIdentity();
-    m_transformMatrix.scale(0.9);
     m_zoomMatrix.setToIdentity();
 }
 
@@ -64,7 +78,8 @@ void GlGraphWidget::setAxisLineWidth(float width)
 void GlGraphWidget::setAxisStyle(AxisStyle style)
 {
     m_axisStyle = style;
-    UpdateGridBuffer();
+    UpdateGrid();
+    UpdateMargins();
 }
 
 void GlGraphWidget::setData(const QVector<float> &data)
@@ -72,15 +87,15 @@ void GlGraphWidget::setData(const QVector<float> &data)
     //init x axis
     if(m_xAxis.size() != data.size())
     {
-        float curX = -1;
-        float stepSize = (float)2/(float)data.size();
+        float curX = -1.0;
+        float stepSize = (float)2.0/(float)data.size();
 
         m_xAxis.resize(data.size());
 
         for(int i = 0; i < data.size(); i++)
         {
-            m_xAxis[i] = curX;
             curX += stepSize;
+            m_xAxis[i] = curX;
         }
     }
 
@@ -105,11 +120,17 @@ void GlGraphWidget::setData(const QVector<float> &data)
     }
 }
 
-void GlGraphWidget::setDataLimits(float min, float max)
+void GlGraphWidget::setYAxisLimits(float min, float max)
 {
     m_fYMin = min;
     m_fYMax = max;
     m_bAutoScale = false;
+}
+
+void GlGraphWidget::setXAxisLimits(float min, float max)
+{
+    m_fXMin = min;
+    m_fXMax = max;
 }
 
 void GlGraphWidget::setAutoScale(bool scale)
@@ -128,7 +149,7 @@ void GlGraphWidget::setGridSize(int x, int y)
     m_iGridSizeX = x;
     m_iGridSizeY = y;
 
-    UpdateGridBuffer();
+    UpdateGrid();
 }
 
 void GlGraphWidget::zoom(float zoomFactor, const QPointF &offset)
@@ -167,7 +188,11 @@ void GlGraphWidget::initializeGL()
 
 void GlGraphWidget::paintEvent(QPaintEvent *event)
 {
+    Q_UNUSED(event)
     makeCurrent(); //Make the GL context current
+
+    CalculateMargins();
+    CreateGridBuffer();
 
     qglClearColor(m_bgColor);
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -204,16 +229,40 @@ void GlGraphWidget::paintEvent(QPaintEvent *event)
     //Draw the graph
     glLineWidth(m_fLineWidth);
     glDrawArrays(GL_LINE_STRIP, 0, m_xAxis.size());
+    glDisable(GL_SCISSOR_TEST);
+
+    drawAxis();
 
     //Clean up
-    glDisable(GL_SCISSOR_TEST);
     glLineWidth(1);
 
-    swapBuffers();
+    drawText();
+}
+
+void GlGraphWidget::drawAxis()
+{
+    if(m_axisStyle == NoAxis)
+        return;
+
+    m_gridShader.bind();
+    m_gridShader.setUniformValue("transform", m_transformMatrix);
+    m_gridShader.enableAttributeArray("vertex");
+    m_gridShader.setAttributeArray("vertex", (GLfloat *)m_fvGridVBuffer.constData(), 2, 0);
+
+    //Draw Axis
+    m_gridShader.setUniformValue("lineColor", m_axisColor);
+    glLineWidth(m_fAxisLineWidth);
+    glDrawArrays(GL_LINES, 0, 4);
+
+    m_gridShader.disableAttributeArray("vertex");
+    m_gridShader.release();
 }
 
 void GlGraphWidget::drawGrid()
 {
+    if(m_fvGridVBuffer.size() <= 8)
+        return;
+
     m_gridShader.bind();
     m_gridShader.setUniformValue("transform", m_transformMatrix);
     m_gridShader.enableAttributeArray("vertex");
@@ -224,41 +273,106 @@ void GlGraphWidget::drawGrid()
     if(m_axisStyle == NoAxis)
         bufferStart = 0;
 
-    if(m_fvGridVBuffer.size() > 8)
+    //Draw grid
+    m_gridShader.setUniformValue("lineColor", m_gridColor);
+    glLineWidth(m_fGridLineWidth);
+    glDrawArrays(GL_LINES, bufferStart, (2*(m_iGridSizeX + 1)) + (2*(m_iGridSizeY + 1)));
+
+    m_gridShader.disableAttributeArray("vertex");
+    m_gridShader.release();
+}
+
+void GlGraphWidget::drawText()
+{
+    QPainter p(this);
+    p.beginNativePainting();
+
+    if(m_bHeaderEnabled)
     {
-        //Draw grid
-        m_gridShader.setUniformValue("lineColor", m_gridColor);
-        glLineWidth(m_fGridLineWidth);
-        glDrawArrays(GL_LINES, bufferStart, (2*(m_iGridSizeX + 1)) + (2*(m_iGridSizeY + 1)));
+        p.setFont(m_fntHeaderFont);
+        p.setPen(m_cHeaderColor);
+        p.drawText(m_headerRect, Qt::AlignCenter, m_sHeaderText);
+        //p.fillRect(m_headerRect, QColor::fromRgb(255,0,0));
+    }
+
+    if(m_bFooterEnabled)
+    {
+        p.setFont(m_fntFooterFont);
+        p.setPen(m_cFooterColor);
+        p.drawText(m_footerRect, Qt::AlignLeft | Qt::AlignVCenter, m_sFooterText);
+        //p.fillRect(m_footerRect, QColor::fromRgb(255,0,0));
     }
 
     if(m_axisStyle != NoAxis)
     {
-        //Draw Axis
-        m_gridShader.setUniformValue("lineColor", m_axisColor);
-        glLineWidth(m_fAxisLineWidth);
-        glDrawArrays(GL_LINES, 0, 4);
+        p.setFont(m_fntAxisFont);
+        p.setPen(m_cAxisTextColor);
+
+        QPoint textPos = m_yAxisRect.topLeft();
+        QFontMetrics metrics(m_fntAxisFont);
+        int textSpacing = m_yAxisRect.height() / m_iGridSizeY;
+        int height = metrics.ascent() - metrics.descent();
+
+        float yMin = m_fMin, yMax = m_fMax;
+        if(!m_bAutoScale)
+        {
+            yMin = m_fYMin;
+            yMax = m_fYMax;
+        }
+
+        float numStart = yMax;
+        float numSpacing = (yMax - yMin) / m_iGridSizeY;
+
+        for(int i = 0; i <= m_iGridSizeY; i++)
+        {
+            QPoint drawPoint = textPos;
+            drawPoint.setY(drawPoint.y() + (height/2));
+
+            p.drawText(drawPoint, QString::number(numStart, 'f', 4));
+            textPos.setY(textPos.y() + textSpacing);
+            numStart -= numSpacing;
+        }
+
+        // X AXIS
+        textPos = m_xAxisRect.bottomLeft();
+        textSpacing = m_xAxisRect.width() / m_iGridSizeY;
+        numStart = m_fXMin;
+        numSpacing = (m_fXMax - m_fXMin) / m_iGridSizeY;
+
+        for(int i = 0; i <= m_iGridSizeY; i++)
+        {
+            QString text = QString::number(numStart, 'f', 0);
+            QPoint drawPoint = textPos;
+            drawPoint.setX(drawPoint.x() - (metrics.width(text)/2));
+
+            p.drawText(drawPoint, text);
+            textPos.setX(textPos.x() + textSpacing);
+            numStart += numSpacing;
+        }
+
+        //p.fillRect(m_yAxisRect, QColor::fromRgb(255,0,0));
+        //p.fillRect(m_xAxisRect, QColor::fromRgb(255,0,0));
     }
 
 
-    m_gridShader.disableAttributeArray("vertex");
-    m_gridShader.release();
+    p.endNativePainting();
 }
 
 void GlGraphWidget::resizeGL(int width, int height)
 {
     //qDebug() << "resizeGL" << width << height;
     glViewport(0,0, width, height);
+    UpdateMargins();
 }
 
 void GlGraphWidget::mousePressEvent(QMouseEvent *event)
 {
-
+    Q_UNUSED(event)
 }
 
 void GlGraphWidget::mouseMoveEvent(QMouseEvent *event)
 {
-
+    Q_UNUSED(event)
 }
 
 void GlGraphWidget::mouseReleaseEvent(QMouseEvent *event)
@@ -304,34 +418,44 @@ float GlGraphWidget::getYOffset()
     return (scaledMin + ((scaledMax - scaledMin) / 2.0)) * -1;
 }
 
-void GlGraphWidget::UpdateGridBuffer()
+void GlGraphWidget::UpdateGrid()
 {
+    m_bUpdateGridBuffer = true;
+}
+
+void GlGraphWidget::CreateGridBuffer()
+{
+    if(!m_bUpdateGridBuffer)
+        return;
+
+    m_bUpdateGridBuffer = false;
+
     m_fvGridVBuffer.reserve(1024);
     m_fvGridVBuffer.clear();
 
     //Set up axis
     if(m_axisStyle == LeftAxis)
     {
-        m_fvGridVBuffer.append(-1.01);
         m_fvGridVBuffer.append(-1);
-        m_fvGridVBuffer.append(-1.01);
+        m_fvGridVBuffer.append(-1);
+        m_fvGridVBuffer.append(-1);
         m_fvGridVBuffer.append(1);
 
-        m_fvGridVBuffer.append(-1.01);
+        m_fvGridVBuffer.append(-1);
         m_fvGridVBuffer.append(-1);
         m_fvGridVBuffer.append(1);
         m_fvGridVBuffer.append(-1);
     }
     else if(m_axisStyle == RightAxis)
     {
-        m_fvGridVBuffer.append(1.01);
+        m_fvGridVBuffer.append(1);
         m_fvGridVBuffer.append(-1);
-        m_fvGridVBuffer.append(1.01);
+        m_fvGridVBuffer.append(1);
         m_fvGridVBuffer.append(1);
 
         m_fvGridVBuffer.append(-1);
         m_fvGridVBuffer.append(-1);
-        m_fvGridVBuffer.append(1.01);
+        m_fvGridVBuffer.append(1);
         m_fvGridVBuffer.append(-1);
     }
 
@@ -369,4 +493,143 @@ void GlGraphWidget::UpdateGridBuffer()
 
         startY += gridHeight;
     }
+}
+
+void GlGraphWidget::UpdateMargins()
+{
+    m_bRecalcMargins = true;
+}
+
+void GlGraphWidget::CalculateMargins()
+{
+    if(!m_bRecalcMargins)
+        return;
+
+    m_bRecalcMargins = false;
+
+    m_transformMatrix.setToIdentity();
+
+    QMargins margins = m_margins;
+
+    if(m_bHeaderEnabled)
+    {
+        QFontMetrics metrics(m_fntHeaderFont);
+        margins.setTop(margins.top() + metrics.height() + TEXT_MARGIN);
+
+        m_headerRect = QRect(m_margins.left(), m_margins.top(), width() - (m_margins.right() + m_margins.left()), metrics.height());
+    }
+
+    if(m_bFooterEnabled)
+    {
+        QFontMetrics metrics(m_fntFooterFont);
+        margins.setBottom(margins.bottom() + metrics.height() + TEXT_MARGIN);
+
+        m_footerRect = QRect(m_margins.left(), height() - (margins.bottom() - TEXT_MARGIN), width() - (m_margins.right() + m_margins.left()), metrics.height());
+    }
+
+    //X axis
+    if(m_axisStyle != NoAxis)
+    {
+        QFontMetrics metrics(m_fntAxisFont);
+        margins.setBottom(margins.bottom() + metrics.height());
+
+        m_xAxisRect = QRect(m_margins.left(), height() - (margins.bottom()), width() - (m_margins.right() + m_margins.left()), metrics.height());
+    }
+
+    if(m_axisStyle == LeftAxis)
+    {
+        QFontMetrics metrics(m_fntAxisFont);
+        margins.setLeft(margins.left() + metrics.width("-0.0000") + TEXT_MARGIN);
+
+        m_yAxisRect = QRect(m_margins.left(), margins.top(), metrics.width("0.0000"), height() - (margins.top() + margins.bottom()));
+        m_xAxisRect.setLeft(margins.left());
+    }
+    else if(m_axisStyle == RightAxis)
+    {
+        QFontMetrics metrics(m_fntFooterFont);
+        margins.setRight(margins.right() + metrics.width("-0.0000") + TEXT_MARGIN);
+
+        m_yAxisRect = QRect(width() - (margins.right() - TEXT_MARGIN), margins.top(), metrics.width("0.0000"), height() - (margins.top() + margins.bottom()));
+        m_xAxisRect.setRight(margins.right());
+    }
+
+    QRect screen = QRect(QPoint(0,0), size());
+    QRect marginRect = screen.marginsRemoved(margins);
+    QPointF translate = ToScreenCoords(screen.center()) - ToScreenCoords(marginRect.center());
+    QSizeF scale;
+    scale.setWidth((float)marginRect.width() / screen.width());
+    scale.setHeight((float)marginRect.height() / screen.height());
+
+    m_transformMatrix.translate(translate.x(), translate.y());
+    m_transformMatrix.scale(scale.width(), scale.height());
+}
+
+QPointF GlGraphWidget::ToScreenCoords(const QPointF &point)
+{
+    QPointF result;
+    result.setX((point.x() * (-2.0/width())) + 1.0);
+    result.setY((point.y() * (2.0/height())) - 1.0);
+    return result;
+}
+
+void GlGraphWidget::setHeaderText(const QString &text)
+{
+    m_sHeaderText = text;
+    m_bHeaderEnabled = !text.isEmpty();
+    UpdateMargins();
+}
+
+void GlGraphWidget::setHeaderFont(const QFont &font)
+{
+    m_fntHeaderFont = font;
+    UpdateMargins();
+}
+
+void GlGraphWidget::setHeaderColor(const QColor &color)
+{
+    m_cHeaderColor = color;
+    UpdateMargins();
+}
+
+void GlGraphWidget::setFooterText(const QString &text)
+{
+    m_sFooterText = text;
+    m_bFooterEnabled = !text.isEmpty();
+    UpdateMargins();
+}
+
+void GlGraphWidget::setFooterFont(const QFont &font)
+{
+    m_fntFooterFont = font;
+    UpdateMargins();
+}
+
+void GlGraphWidget::setFooterColor(const QColor &color)
+{
+    m_cFooterColor = color;
+    UpdateMargins();
+}
+
+void GlGraphWidget::setAxisFont(const QFont &font)
+{
+    m_fntAxisFont = font;
+    UpdateMargins();
+}
+
+void GlGraphWidget::setAxisTextColor(const QColor &color)
+{
+    m_cAxisTextColor = color;
+    UpdateMargins();
+}
+
+void GlGraphWidget::setMargins(int margin)
+{
+    m_margins = QMargins(margin, margin, margin, margin);
+    UpdateMargins();
+}
+
+void GlGraphWidget::setMargins(int left, int top, int right, int bottom)
+{
+    m_margins = QMargins(left, top, right, bottom);
+    UpdateMargins();
 }

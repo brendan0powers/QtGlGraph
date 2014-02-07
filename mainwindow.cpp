@@ -12,6 +12,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     //ui->graphWidget->setDataLimits(-3, 10);
     ui->graphWidget->setGridSize(10,10);
+    ui->graphWidget->setXAxisLimits(0,4000);
+    ui->graphWidget->setHeaderText("Graph Title");
+    ui->graphWidget->setFooterText("This is a footer.");
 
     m_data.resize(4000);
     newData();
@@ -66,13 +69,13 @@ void MainWindow::on_AutoScaleButton_toggled(bool checked)
 
 void MainWindow::on_YMax_valueChanged(double)
 {
-    ui->graphWidget->setDataLimits(ui->YMin->value(), ui->YMax->value());
+    ui->graphWidget->setYAxisLimits(ui->YMin->value(), ui->YMax->value());
     ui->graphWidget->setAutoScale(ui->AutoScaleButton->isChecked());
 }
 
 void MainWindow::on_YMin_valueChanged(double)
 {
-    ui->graphWidget->setDataLimits(ui->YMin->value(), ui->YMax->value());
+    ui->graphWidget->setYAxisLimits(ui->YMin->value(), ui->YMax->value());
     ui->graphWidget->setAutoScale(ui->AutoScaleButton->isChecked());
 }
 
@@ -104,4 +107,14 @@ void MainWindow::on_GridY_valueChanged(int)
 void MainWindow::on_fps_valueChanged(int value)
 {
     m_timer->start(1000/value);
+}
+
+void MainWindow::on_lineHeader_textChanged(const QString text)
+{
+    ui->graphWidget->setHeaderText(text);
+}
+
+void MainWindow::on_lineFooter_textChanged(const QString text)
+{
+    ui->graphWidget->setFooterText(text);
 }
